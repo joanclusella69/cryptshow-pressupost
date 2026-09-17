@@ -160,11 +160,17 @@ export default function DataBlock({ tableName, fields, title, eyebrow, resolveFi
           <tbody>
             {filtrades.map((r) => (
               <tr key={r.id}>
-                {fields.map((f) => (
-                  <td key={f.key}>
-                    {f.type === "boolean" ? (r[f.key] ? "Sí" : "No") : r[f.key]}
-                  </td>
-                ))}
+                {fields.map((f) => {
+                  const val = r[f.key];
+                  const isEmpty = val === null || val === undefined || val === "";
+                  let display: React.ReactNode = "";
+                  if (!isEmpty) {
+                    if (f.type === "boolean") display = val ? "Sí" : "No";
+                    else if (f.type === "number") display = `${Number(val).toLocaleString("ca-ES")} €`;
+                    else display = val;
+                  }
+                  return <td key={f.key}>{display}</td>;
+                })}
                 <td><button className="link-btn" onClick={() => eliminar(r.id)}>eliminar</button></td>
               </tr>
             ))}

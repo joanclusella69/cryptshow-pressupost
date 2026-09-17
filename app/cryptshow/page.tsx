@@ -2,13 +2,13 @@
 
 import { useState } from "react";
 import { EDICIONS } from "@/lib/fields";
-import PublicitatBloc from "@/components/PublicitatBloc";
+import CryptshowBloc from "@/components/CryptshowBloc";
 
-export default function PublicitatPage() {
+export default function CryptshowPage() {
   const [edicio, setEdicio] = useState(EDICIONS[0]);
 
   return (
-    <section style={{ maxWidth: 1000 }}>
+    <section style={{ maxWidth: 800 }}>
       <div
         style={{
           display: "flex",
@@ -20,15 +20,15 @@ export default function PublicitatPage() {
         }}
       >
         <div>
-          <div className="eyebrow">Anunciants i patrocinadors</div>
-          <h2>Publicitat</h2>
+          <div className="eyebrow">Resum d'ingressos propis</div>
+          <h2>Cryptshow</h2>
         </div>
         <select value={edicio} onChange={(e) => setEdicio(e.target.value)}>
           {EDICIONS.map((e) => <option key={e} value={e}>{e}</option>)}
         </select>
       </div>
 
-      <PublicitatBloc edicio={edicio} />
+      <CryptshowBloc edicio={edicio} />
     </section>
   );
 }

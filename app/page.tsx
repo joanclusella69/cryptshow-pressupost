@@ -25,29 +25,31 @@ function Stat({ label, value }: { label: string; value: string }) {
 export default function ResumPage() {
   const [edicio, setEdicio] = useState(EDICIONS[0]);
   const [loading, setLoading] = useState(true);
-  const [stats, setStats] = useState({ ingressos: 0, despeses: 0, entrades: 0, mercha: 0, publicitat: 0 });
+  const [stats, setStats] = useState({ ingressos: 0, despeses: 0, entrades: 0, mercha: 0, publicitat: 0, altres: 0 });
 
   useEffect(() => {
     const carregar = async () => {
       setLoading(true);
-      const [mov, ent, mer, pub] = await Promise.all([
+      const [mov, ent, mer, pub, alt] = await Promise.all([
         supabase.from("moviments").select("tipus, real").eq("edicio", edicio),
         supabase.from("entrades").select("caixa, web").eq("edicio", edicio),
         supabase.from("mercha").select("total").eq("edicio", edicio),
         supabase.from("publicitat").select("confirmat").eq("edicio", edicio),
+        supabase.from("cryptshow_altres").select("import").eq("edicio", edicio),
       ]);
       const ingressos = (mov.data || []).filter((m) => m.tipus === "ingres").reduce((s, m) => s + Number(m.real || 0), 0);
       const despeses = (mov.data || []).filter((m) => m.tipus === "despesa").reduce((s, m) => s + Number(m.real || 0), 0);
       const entrades = (ent.data || []).reduce((s, e) => s + Number(e.caixa || 0) + Number(e.web || 0), 0);
       const mercha = (mer.data || []).reduce((s, m) => s + Number(m.total || 0), 0);
       const publicitat = (pub.data || []).reduce((s, p) => s + Number(p.confirmat || 0), 0);
-      setStats({ ingressos, despeses, entrades, mercha, publicitat });
+      const altres = (alt.data || []).reduce((s, a) => s + Number(a.import || 0), 0);
+      setStats({ ingressos, despeses, entrades, mercha, publicitat, altres });
       setLoading(false);
     };
     carregar();
   }, [edicio]);
 
-  const balanc = stats.ingressos + stats.entrades + stats.mercha + stats.publicitat - stats.despeses;
+  const balanc = stats.ingressos + stats.entrades + stats.mercha + stats.publicitat + stats.altres - stats.despeses;
   const fmt = (n: number) => `${n.toLocaleString("ca-ES")} €`;
 
   return (

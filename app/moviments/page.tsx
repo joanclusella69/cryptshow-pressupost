@@ -1,15 +1,15 @@
 "use client";
 
 import { useState } from "react";
-import { EDICIONS, CATEGORIES_INGRES } from "@/lib/fields";
-import DespesesCards from "@/components/DespesesCards";
-import MovimentBloc from "@/components/MovimentBloc";
+import { EDICIONS, CATEGORIES_DESPESA, CATEGORIES_INGRES } from "@/lib/fields";
+import CategoriaGrid from "@/components/CategoriaGrid";
 
 export default function MovimentsPage() {
   const [edicio, setEdicio] = useState(EDICIONS[0]);
+  const [refreshKey] = useState(0);
 
   return (
-    <section style={{ maxWidth: 1000 }}>
+    <section style={{ maxWidth: 900 }}>
       <div
         style={{
           display: "flex",
@@ -29,12 +29,17 @@ export default function MovimentsPage() {
         </select>
       </div>
 
-      <h2 style={{ marginBottom: 16 }}>Despeses</h2>
-      <DespesesCards edicio={edicio} />
+      <h2 style={{ marginBottom: 12 }}>Despeses</h2>
+      <p className="empty" style={{ marginBottom: 12 }}>
+        Els gastos concrets s'introdueixen a l'apartat "Proveïdors" — aquí només es veu el resum per categoria.
+      </p>
+      <CategoriaGrid edicio={edicio} tipus="despesa" categories={CATEGORIES_DESPESA} refreshKey={refreshKey} />
 
-      <div style={{ marginTop: 40 }}>
-        <MovimentBloc edicio={edicio} tipus="ingres" titol="Ingressos" categories={CATEGORIES_INGRES} />
-      </div>
+      <h2 style={{ margin: "32px 0 12px" }}>Ingressos</h2>
+      <p className="empty" style={{ marginBottom: 12 }}>
+        Fes clic sobre l'import de "Real" per escriure'l directament. "Publicitat i patrocinadors" i "Aportació Cryptshow" es calculen soles des dels seus propis apartats.
+      </p>
+      <CategoriaGrid edicio={edicio} tipus="ingres" categories={CATEGORIES_INGRES} refreshKey={refreshKey} />
     </section>
   );
 }

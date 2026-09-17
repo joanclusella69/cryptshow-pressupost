@@ -15,17 +15,24 @@ const CATEGORIES_AUTOMATIQUES = ["Aportació Cryptshow", "Publicitat i patrocina
 export default function CategoriaGrid({ edicio, tipus, categories, refreshKey }: CategoriaGridProps) {
   const [reals, setReals] = useState<Record<string, number>>({});
   const [previstos, setPrevistos] = useState<Record<string, number>>({});
+  const [movIds, setMovIds] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [editant, setEditant] = useState<string | null>(null);
+  const [editantReal, setEditantReal] = useState<string | null>(null);
 
   const carregar = async () => {
     setLoading(true);
     const [mov, prev] = await Promise.all([
-      supabase.from("moviments").select("categoria, real").eq("edicio", edicio).eq("tipus", tipus),
+      supabase.from("moviments").select("id, categoria, real").eq("edicio", edicio).eq("tipus", tipus),
       supabase.from("previstos").select("categoria, previst").eq("edicio", edicio).eq("tipus", tipus),
     ]);
     const r: Record<string, number> = {};
-    (mov.data || []).forEach((m: any) => { r[m.categoria] = (r[m.categoria] || 0) + Number(m.real || 0); });
+    const ids: Record<string, string> = {};
+    (mov.data || []).forEach((m: any) => {
+      r[m.categoria] = (r[m.categoria] || 0) + Number(m.real || 0);
+      if (!ids[m.categoria]) ids[m.categoria] = m.id;
+    });
+    setMovIds(ids);
 
     if (tipus === "ingres") {
       const [pub, ent, mer, altres] = await Promise.all([
@@ -59,6 +66,22 @@ export default function CategoriaGrid({ edicio, tipus, categories, refreshKey }:
       .upsert({ edicio, tipus, categoria, previst: valor }, { onConflict: "edicio,tipus,categoria" });
     setPrevistos({ ...previstos, [categoria]: valor });
     setEditant(null);
+  };
+
+  const desarReal = async (categoria: string, valor: number) => {
+    const idExistent = movIds[categoria];
+    if (idExistent) {
+      await supabase.from("moviments").update({ real: valor }).eq("id", idExistent);
+    } else {
+      const { data } = await supabase
+        .from("moviments")
+        .insert({ edicio, tipus, categoria, data: new Date().toISOString().slice(0, 10), concepte: "Ingrés", real: valor })
+        .select()
+        .single();
+      if (data) setMovIds({ ...movIds, [categoria]: data.id });
+    }
+    setReals({ ...reals, [categoria]: valor });
+    setEditantReal(null);
   };
 
   const totalPrevist = categories.reduce((s, c) => s + (previstos[c] || 0), 0);
@@ -104,7 +127,28 @@ export default function CategoriaGrid({ edicio, tipus, categories, refreshKey }:
                   fmt(previst)
                 )}
               </td>
-              <td>{real ? fmt(real) : ""}</td>
+              {tipus === "ingres" && !automatica ? (
+                <td
+                  onClick={() => setEditantReal(c)}
+                  style={{ cursor: "pointer", color: "var(--accent-amber)" }}
+                  title="Fes clic per escriure l'import"
+                >
+                  {editantReal === c ? (
+                    <input
+                      autoFocus
+                      type="number"
+                      defaultValue={real}
+                      style={{ width: 90 }}
+                      onBlur={(e) => desarReal(c, Number(e.target.value) || 0)}
+                      onKeyDown={(e) => e.key === "Enter" && desarReal(c, Number((e.target as HTMLInputElement).value) || 0)}
+                    />
+                  ) : (
+                    fmt(real)
+                  )}
+                </td>
+              ) : (
+                <td>{real ? fmt(real) : ""}</td>
+              )}
               <td style={{ color: diff < 0 ? "#d38b90" : "var(--text-dim)" }}>{fmt(diff)}</td>
             </tr>
           );

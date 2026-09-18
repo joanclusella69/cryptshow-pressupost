@@ -30,18 +30,20 @@ export default function ResumPage() {
   useEffect(() => {
     const carregar = async () => {
       setLoading(true);
-      const [mov, pub, dies, altres] = await Promise.all([
+      const [mov, pub, dies, altres, mer] = await Promise.all([
         supabase.from("moviments").select("tipus, real").eq("edicio", edicio),
         supabase.from("publicitat").select("confirmat").eq("edicio", edicio),
-        supabase.from("cryptshow_dies").select("entrades, mercha").eq("edicio", edicio),
+        supabase.from("cryptshow_dies").select("entrades").eq("edicio", edicio),
         supabase.from("cryptshow_altres").select("import").eq("edicio", edicio),
+        supabase.from("mercha").select("total").eq("edicio", edicio),
       ]);
       const ingressos = (mov.data || []).filter((m) => m.tipus === "ingres").reduce((s, m) => s + Number(m.real || 0), 0);
       const despeses = (mov.data || []).filter((m) => m.tipus === "despesa").reduce((s, m) => s + Number(m.real || 0), 0);
       const publicitat = (pub.data || []).reduce((s, p) => s + Number(p.confirmat || 0), 0);
-      const totalDies = (dies.data || []).reduce((s, d) => s + Number(d.entrades || 0) + Number(d.mercha || 0), 0);
+      const totalEntrades = (dies.data || []).reduce((s, d) => s + Number(d.entrades || 0), 0);
+      const totalMercha = (mer.data || []).reduce((s, m) => s + Number(m.total || 0), 0);
       const totalAltres = (altres.data || []).reduce((s, a) => s + Number(a.import || 0), 0);
-      setStats({ ingressos, despeses, aportacioCryptshow: totalDies + totalAltres, publicitat });
+      setStats({ ingressos, despeses, aportacioCryptshow: totalEntrades + totalMercha + totalAltres, publicitat });
       setLoading(false);
     };
     carregar();

@@ -5,12 +5,21 @@ import { supabase } from "@/lib/supabaseClient";
 
 const fmt = (n: number) => `${Number(n || 0).toLocaleString("ca-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`;
 
-function DiaCard({ dia, onChange, onDelete }: { dia: any; onChange: (camp: string, valor: any) => void; onDelete: () => void }) {
+function DiaCard({
+  dia,
+  merchaDia,
+  onChange,
+  onDelete,
+}: {
+  dia: any;
+  merchaDia: number;
+  onChange: (camp: string, valor: any) => void;
+  onDelete: () => void;
+}) {
   const [nom, setNom] = useState(dia.nom);
   const [entrades, setEntrades] = useState(dia.entrades ?? "");
-  const [mercha, setMercha] = useState(dia.mercha ?? "");
 
-  const total = Number(entrades || 0) + Number(mercha || 0);
+  const total = Number(entrades || 0) + merchaDia;
 
   return (
     <div className="card">
@@ -24,7 +33,7 @@ function DiaCard({ dia, onChange, onDelete }: { dia: any; onChange: (camp: strin
           <input type="number" value={entrades} onChange={(e) => setEntrades(e.target.value)} onBlur={() => onChange("entrades", Number(entrades) || 0)} />
         </label>
         <label>Mercha €
-          <input type="number" value={mercha} onChange={(e) => setMercha(e.target.value)} onBlur={() => onChange("mercha", Number(mercha) || 0)} />
+          <input type="text" value={fmt(merchaDia)} disabled style={{ opacity: 0.7, cursor: "not-allowed" }} title="Calculat automàticament des de la pestanya Mercha" />
         </label>
       </div>
     </div>
@@ -34,13 +43,16 @@ function DiaCard({ dia, onChange, onDelete }: { dia: any; onChange: (camp: strin
 export default function CryptshowBloc({ edicio }: { edicio: string }) {
   const [dies, setDies] = useState<any[]>([]);
   const [altres, setAltres] = useState<any[]>([]);
+  const [merchaPerDia, setMerchaPerDia] = useState<Record<string, number>>({});
+  const [totalMercha, setTotalMercha] = useState(0);
   const [loading, setLoading] = useState(true);
 
   const carregar = async () => {
     setLoading(true);
-    const [d, a] = await Promise.all([
+    const [d, a, m] = await Promise.all([
       supabase.from("cryptshow_dies").select("*").eq("edicio", edicio).order("created_at"),
       supabase.from("cryptshow_altres").select("*").eq("edicio", edicio).order("created_at"),
+      supabase.from("mercha").select("dia, total").eq("edicio", edicio),
     ]);
     let diesData = d.data || [];
     if (diesData.length === 0) {
@@ -51,6 +63,16 @@ export default function CryptshowBloc({ edicio }: { edicio: string }) {
     }
     setDies(diesData);
     setAltres(a.data || []);
+
+    const merchaRows = m.data || [];
+    const perDia: Record<string, number> = {};
+    let totM = 0;
+    merchaRows.forEach((r: any) => {
+      perDia[r.dia] = (perDia[r.dia] || 0) + Number(r.total || 0);
+      totM += Number(r.total || 0);
+    });
+    setMerchaPerDia(perDia);
+    setTotalMercha(totM);
     setLoading(false);
   };
 
@@ -89,9 +111,9 @@ export default function CryptshowBloc({ edicio }: { edicio: string }) {
     setAltres(altres.filter((a) => a.id !== id));
   };
 
-  const totalDies = dies.reduce((s, d) => s + Number(d.entrades || 0) + Number(d.mercha || 0), 0);
+  const totalEntrades = dies.reduce((s, d) => s + Number(d.entrades || 0), 0);
   const totalAltres = altres.reduce((s, a) => s + Number(a.import || 0), 0);
-  const totalCryptshow = totalDies + totalAltres;
+  const totalCryptshow = totalEntrades + totalMercha + totalAltres;
 
   if (loading) return <p className="empty">Carregant…</p>;
 
@@ -99,7 +121,13 @@ export default function CryptshowBloc({ edicio }: { edicio: string }) {
     <div>
       <div className="grid">
         {dies.map((d) => (
-          <DiaCard key={d.id} dia={d} onChange={(camp, valor) => actualitzarDia(d.id, camp, valor)} onDelete={() => eliminarDia(d.id)} />
+          <DiaCard
+            key={d.id}
+            dia={d}
+            merchaDia={merchaPerDia[d.nom] || 0}
+            onChange={(camp, valor) => actualitzarDia(d.id, camp, valor)}
+            onDelete={() => eliminarDia(d.id)}
+          />
         ))}
       </div>
       <button className="btn" onClick={afegirDia} style={{ marginBottom: 16 }}>+ Afegir dia</button>
@@ -121,7 +149,7 @@ export default function CryptshowBloc({ edicio }: { edicio: string }) {
 
       <div className="link-line">
         <div><span className="dim">Total Cryptshow:</span> <b style={{ fontSize: 20 }}>{fmt(totalCryptshow)}</b></div>
-        <div className="dim">→ Dies (Entrades+Mercha) + Altres = <b style={{ color: "var(--accent-amber)" }}>Real</b> de "Aportació Cryptshow" a Ingressos</div>
+        <div className="dim">→ Entrades + Mercha (automàtic) + Altres = <b style={{ color: "var(--accent-amber)" }}>Real</b> de "Aportació Cryptshow" a Ingressos</div>
       </div>
     </div>
   );

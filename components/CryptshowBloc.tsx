@@ -3,25 +3,54 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 
-const fmt = (n: number) =>
-  `${Number(n || 0).toLocaleString("ca-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`;
+const fmt = (n: number) => `${Number(n || 0).toLocaleString("ca-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`;
+
+function DiaCard({ dia, onChange, onDelete }: { dia: any; onChange: (camp: string, valor: any) => void; onDelete: () => void }) {
+  const [nom, setNom] = useState(dia.nom);
+  const [entrades, setEntrades] = useState(dia.entrades ?? "");
+  const [mercha, setMercha] = useState(dia.mercha ?? "");
+
+  const total = Number(entrades || 0) + Number(mercha || 0);
+
+  return (
+    <div className="card">
+      <div className="card-top">
+        <input className="dia-nom" value={nom} onChange={(e) => setNom(e.target.value)} onBlur={() => onChange("nom", nom)} />
+        <span className="dia-total">{fmt(total)}</span>
+        <button className="link-btn" onClick={onDelete} title="Eliminar dia">×</button>
+      </div>
+      <div className="row">
+        <label>Entrades €
+          <input type="number" value={entrades} onChange={(e) => setEntrades(e.target.value)} onBlur={() => onChange("entrades", Number(entrades) || 0)} />
+        </label>
+        <label>Mercha €
+          <input type="number" value={mercha} onChange={(e) => setMercha(e.target.value)} onBlur={() => onChange("mercha", Number(mercha) || 0)} />
+        </label>
+      </div>
+    </div>
+  );
+}
 
 export default function CryptshowBloc({ edicio }: { edicio: string }) {
-  const [totalEntrades, setTotalEntrades] = useState(0);
-  const [totalMercha, setTotalMercha] = useState(0);
+  const [dies, setDies] = useState<any[]>([]);
   const [altres, setAltres] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   const carregar = async () => {
     setLoading(true);
-    const [ent, mer, alt] = await Promise.all([
-      supabase.from("entrades").select("caixa, web").eq("edicio", edicio),
-      supabase.from("mercha").select("total").eq("edicio", edicio),
+    const [d, a] = await Promise.all([
+      supabase.from("cryptshow_dies").select("*").eq("edicio", edicio).order("created_at"),
       supabase.from("cryptshow_altres").select("*").eq("edicio", edicio).order("created_at"),
     ]);
-    setTotalEntrades((ent.data || []).reduce((s: number, e: any) => s + Number(e.caixa || 0) + Number(e.web || 0), 0));
-    setTotalMercha((mer.data || []).reduce((s: number, m: any) => s + Number(m.total || 0), 0));
-    setAltres(alt.data || []);
+    let diesData = d.data || [];
+    if (diesData.length === 0) {
+      const base = ["Previ", "Dia 1", "Dia 2", "Dia 3"];
+      const inserts = base.map((nom) => ({ edicio, nom, entrades: 0, mercha: 0 }));
+      const { data: creats } = await supabase.from("cryptshow_dies").insert(inserts).select();
+      diesData = creats || [];
+    }
+    setDies(diesData);
+    setAltres(a.data || []);
     setLoading(false);
   };
 
@@ -30,17 +59,28 @@ export default function CryptshowBloc({ edicio }: { edicio: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [edicio]);
 
+  const actualitzarDia = async (id: string, camp: string, valor: any) => {
+    setDies(dies.map((d) => (d.id === id ? { ...d, [camp]: valor } : d)));
+    await supabase.from("cryptshow_dies").update({ [camp]: valor }).eq("id", id);
+  };
+
+  const afegirDia = async () => {
+    const { data } = await supabase.from("cryptshow_dies").insert({ edicio, nom: `Dia ${dies.length}`, entrades: 0, mercha: 0 }).select().single();
+    if (data) setDies([...dies, data]);
+  };
+
+  const eliminarDia = async (id: string) => {
+    await supabase.from("cryptshow_dies").delete().eq("id", id);
+    setDies(dies.filter((d) => d.id !== id));
+  };
+
   const actualitzarAltre = async (id: string, camp: string, valor: any) => {
     setAltres(altres.map((a) => (a.id === id ? { ...a, [camp]: valor } : a)));
     await supabase.from("cryptshow_altres").update({ [camp]: valor }).eq("id", id);
   };
 
   const afegirAltre = async () => {
-    const { data } = await supabase
-      .from("cryptshow_altres")
-      .insert({ edicio, nom: "Altres", import: 0 })
-      .select()
-      .single();
+    const { data } = await supabase.from("cryptshow_altres").insert({ edicio, nom: "Altres", import: 0 }).select().single();
     if (data) setAltres([...altres, data]);
   };
 
@@ -49,25 +89,20 @@ export default function CryptshowBloc({ edicio }: { edicio: string }) {
     setAltres(altres.filter((a) => a.id !== id));
   };
 
+  const totalDies = dies.reduce((s, d) => s + Number(d.entrades || 0) + Number(d.mercha || 0), 0);
   const totalAltres = altres.reduce((s, a) => s + Number(a.import || 0), 0);
-  const totalCryptshow = totalEntrades + totalMercha + totalAltres;
+  const totalCryptshow = totalDies + totalAltres;
 
   if (loading) return <p className="empty">Carregant…</p>;
 
   return (
     <div>
-      <div className="stats">
-        <div className="stat">
-          <div className="lbl">Total Entrades</div>
-          <div className="val">{fmt(totalEntrades)}</div>
-          <div className="src">calculat des de la pestanya "Entrades"</div>
-        </div>
-        <div className="stat">
-          <div className="lbl">Total Mercha</div>
-          <div className="val">{fmt(totalMercha)}</div>
-          <div className="src">calculat des de la pestanya "Mercha"</div>
-        </div>
+      <div className="grid">
+        {dies.map((d) => (
+          <DiaCard key={d.id} dia={d} onChange={(camp, valor) => actualitzarDia(d.id, camp, valor)} onDelete={() => eliminarDia(d.id)} />
+        ))}
       </div>
+      <button className="btn" onClick={afegirDia} style={{ marginBottom: 16 }}>+ Afegir dia</button>
 
       <div className="section">
         <div className="section-head">
@@ -86,7 +121,7 @@ export default function CryptshowBloc({ edicio }: { edicio: string }) {
 
       <div className="link-line">
         <div><span className="dim">Total Cryptshow:</span> <b style={{ fontSize: 20 }}>{fmt(totalCryptshow)}</b></div>
-        <div className="dim">→ Entrades + Mercha + Altres = <b style={{ color: "var(--accent-amber)" }}>Real</b> de "Aportació Cryptshow" a Ingressos</div>
+        <div className="dim">→ Dies (Entrades+Mercha) + Altres = <b style={{ color: "var(--accent-amber)" }}>Real</b> de "Aportació Cryptshow" a Ingressos</div>
       </div>
     </div>
   );

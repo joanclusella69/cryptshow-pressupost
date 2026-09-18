@@ -2,169 +2,224 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
-import { ARTICLES_MERCHA } from "@/lib/fields";
+
+const PRODUCTES_BASE = [
+  { nom: "Samarretes", pvp: 15 },
+  { nom: "Bosses", pvp: 8 },
+  { nom: "Xapes", pvp: 2 },
+  { nom: "Xapa petita", pvp: 1 },
+  { nom: "Samarretes staff", pvp: 10 },
+  { nom: "Bossa staff", pvp: 5 },
+  { nom: "Samarreta anterior", pvp: 5 },
+  { nom: "Bossa anterior", pvp: 2.5 },
+];
+const NOMS_BASE = PRODUCTES_BASE.map((p) => p.nom);
+
+const REFERENCIA_2026: Record<string, number> = {
+  "Samarretes": 443, "Bosses": 96, "Xapes": 3, "Xapa petita": 4,
+  "Samarretes staff": 60, "Bossa staff": 5, "Samarreta anterior": 50, "Bossa anterior": 0,
+};
+
+const DIES_BASE = ["Previ", "Dia 1", "Dia 2", "Dia 3"];
 
 const fmt = (n: number) => `${Number(n || 0).toLocaleString("ca-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`;
 
-// Totals reals del 2026 per article (calculats des del full Excel original).
-const REFERENCIA_2026: Record<string, number> = {
-  "Samarretes": 443,
-  "Bosses": 96,
-  "Xapes": 3,
-  "Xapa petita": 4,
-  "Samarretes staff": 60,
-  "Bossa staff": 5,
-  "Samarreta anterior": 50,
-  "Bossa anterior": 0,
-};
-
-function DiaGroup({
+function ProducteRow({
+  edicio,
   dia,
-  linies,
+  fila,
   onRefresh,
 }: {
+  edicio: string;
   dia: string;
-  linies: any[];
+  fila: any;
   onRefresh: () => void;
 }) {
-  const [nouArticle, setNouArticle] = useState(ARTICLES_MERCHA[0]);
-  const [novaQuantitat, setNovaQuantitat] = useState("");
-  const [nouTotal, setNouTotal] = useState("");
-  const [editantData, setEditantData] = useState(false);
+  const [unitats, setUnitats] = useState(fila.quantitat ?? "");
+  const [pvp, setPvp] = useState(fila.pvp ?? "");
 
-  const totalDia = linies.reduce((s, l) => s + Number(l.total || 0), 0);
-  const edicio = linies[0]?.edicio;
+  const total = Number(unitats || 0) * Number(pvp || 0);
 
-  const afegirLinia = async () => {
-    if (!nouTotal) return;
-    await supabase.from("mercha").insert({
-      edicio,
-      dia,
-      article: nouArticle,
-      quantitat: novaQuantitat ? Number(novaQuantitat) : null,
-      total: Number(nouTotal),
-    });
-    setNovaQuantitat("");
-    setNouTotal("");
+  const desar = async () => {
+    await supabase.from("mercha").upsert(
+      { edicio, dia, article: fila.article, quantitat: unitats === "" ? null : Number(unitats), pvp: pvp === "" ? null : Number(pvp), total },
+      { onConflict: "edicio,dia,article" }
+    );
     onRefresh();
   };
 
-  const eliminarLinia = async (id: string) => {
-    await supabase.from("mercha").delete().eq("id", id);
+  return (
+    <div className="linia">
+      <span style={{ flex: 1.3, fontSize: 11 }}>{fila.article}</span>
+      <input type="number" style={{ flex: 0.6 }} placeholder="0" value={unitats} onChange={(e) => setUnitats(e.target.value)} onBlur={desar} />
+      <input type="number" style={{ flex: 0.7 }} value={pvp} onChange={(e) => setPvp(e.target.value)} onBlur={desar} />
+      <span style={{ flex: 0.8, fontSize: 11, color: "var(--accent-amber)" }}>{fmt(total)}</span>
+    </div>
+  );
+}
+
+function AltreProducteRow({ fila, onRefresh }: { fila: any; onRefresh: () => void }) {
+  const [nom, setNom] = useState(fila.article || "");
+  const [unitats, setUnitats] = useState(fila.quantitat ?? "");
+  const [pvp, setPvp] = useState(fila.pvp ?? 2.5);
+  const total = Number(unitats || 0) * Number(pvp || 0);
+
+  const desar = async () => {
+    await supabase.from("mercha").update({ article: nom, quantitat: unitats === "" ? null : Number(unitats), pvp: Number(pvp), total }).eq("id", fila.id);
     onRefresh();
   };
 
-  const canviarData = async (novaData: string) => {
-    await supabase.from("mercha").update({ dia: novaData }).eq("dia", dia).eq("edicio", edicio);
-    setEditantData(false);
+  const eliminar = async () => {
+    await supabase.from("mercha").delete().eq("id", fila.id);
+    onRefresh();
+  };
+
+  return (
+    <div className="linia">
+      <input style={{ flex: 1.3 }} placeholder="Nom producte" value={nom} onChange={(e) => setNom(e.target.value)} onBlur={desar} />
+      <input type="number" style={{ flex: 0.6 }} placeholder="0" value={unitats} onChange={(e) => setUnitats(e.target.value)} onBlur={desar} />
+      <input type="number" style={{ flex: 0.7 }} value={pvp} onChange={(e) => setPvp(e.target.value)} onBlur={desar} />
+      <span style={{ flex: 0.8, fontSize: 11, color: "var(--accent-amber)" }}>{fmt(total)}</span>
+      <button className="link-btn" onClick={eliminar}>×</button>
+    </div>
+  );
+}
+
+function DiaCard({
+  edicio,
+  nom,
+  files,
+  onRenamed,
+  onDeleted,
+  onRefresh,
+}: {
+  edicio: string;
+  nom: string;
+  files: any[];
+  onRenamed: (nouNom: string) => void;
+  onDeleted: () => void;
+  onRefresh: () => void;
+}) {
+  const [editantNom, setEditantNom] = useState(false);
+
+  const filesBase = NOMS_BASE.map(
+    (n) => files.find((f) => f.article === n) || { article: n, quantitat: "", pvp: PRODUCTES_BASE.find((p) => p.nom === n)!.pvp }
+  );
+  const filesExtra = files.filter((f) => !NOMS_BASE.includes(f.article));
+
+  const totalDia = files.reduce((s, f) => s + Number(f.total || 0), 0) +
+    filesBase.filter((f) => !f.id).reduce((s) => s, 0); // les virtuals encara no compten (total 0 fins que es desin)
+
+  const renombrar = async (nouNom: string) => {
+    if (nouNom && nouNom !== nom) {
+      await supabase.from("mercha").update({ dia: nouNom }).eq("edicio", edicio).eq("dia", nom);
+      onRenamed(nouNom);
+    }
+    setEditantNom(false);
+  };
+
+  const eliminarDia = async () => {
+    await supabase.from("mercha").delete().eq("edicio", edicio).eq("dia", nom);
+    onDeleted();
+  };
+
+  const afegirAltre = async () => {
+    await supabase.from("mercha").insert({ edicio, dia: nom, article: "", quantitat: null, pvp: 2.5, total: 0 });
     onRefresh();
   };
 
   return (
     <div className="card">
       <div className="card-top">
-        {editantData ? (
-          <input
-            autoFocus
-            type="date"
-            defaultValue={dia}
-            className="dia-nom"
-            onBlur={(e) => canviarData(e.target.value)}
-          />
+        {editantNom ? (
+          <input autoFocus className="dia-nom" defaultValue={nom} onBlur={(e) => renombrar(e.target.value)} onKeyDown={(e) => e.key === "Enter" && renombrar((e.target as HTMLInputElement).value)} />
         ) : (
-          <span className="dia-nom" onClick={() => setEditantData(true)} style={{ cursor: "pointer" }}>
-            {dia || "(sense data — fes clic)"}
-          </span>
+          <span className="dia-nom" onClick={() => setEditantNom(true)} style={{ cursor: "pointer" }}>{nom}</span>
         )}
         <span className="dia-total">{fmt(totalDia)}</span>
+        <button className="link-btn" onClick={eliminarDia} title="Eliminar dia">×</button>
       </div>
 
-      {linies.map((l) => (
-        <div className="linia" key={l.id}>
-          <span style={{ flex: 1.4, fontSize: 11, color: "var(--text-dim)" }}>{l.article}</span>
-          <span style={{ flex: 0.7, fontSize: 11, color: "var(--text-dim)" }}>{l.quantitat ?? ""}</span>
-          <span style={{ flex: 0.7, fontSize: 11 }}>{fmt(l.total)}</span>
-          <button className="link-btn" onClick={() => eliminarLinia(l.id)}>×</button>
-        </div>
+      <div className="capcalera-linia">
+        <span style={{ flex: 1.3 }}>Producte</span>
+        <span style={{ flex: 0.6 }}>Uds</span>
+        <span style={{ flex: 0.7 }}>PVP</span>
+        <span style={{ flex: 0.8 }}>Total</span>
+      </div>
+
+      {filesBase.map((f) => (
+        <ProducteRow key={f.article} edicio={edicio} dia={nom} fila={f} onRefresh={onRefresh} />
+      ))}
+      {filesExtra.map((f) => (
+        <AltreProducteRow key={f.id} fila={f} onRefresh={onRefresh} />
       ))}
 
-      <div className="linia" style={{ marginTop: 6 }}>
-        <select value={nouArticle} onChange={(e) => setNouArticle(e.target.value)}>
-          {ARTICLES_MERCHA.map((a) => <option key={a} value={a}>{a}</option>)}
-        </select>
-        <input type="number" placeholder="Uds" value={novaQuantitat} onChange={(e) => setNovaQuantitat(e.target.value)} />
-        <input type="number" placeholder="Total €" value={nouTotal} onChange={(e) => setNouTotal(e.target.value)} />
-        <button className="link-btn" onClick={afegirLinia} style={{ fontSize: 16 }}>+</button>
-      </div>
+      <button className="add-linia" onClick={afegirAltre}>+ afegir altre producte</button>
     </div>
   );
 }
 
 export default function MerchaCards({ edicio }: { edicio: string }) {
   const [rows, setRows] = useState<any[]>([]);
+  const [diesExtra, setDiesExtra] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
-  const [novaData, setNovaData] = useState("");
 
   const carregar = async () => {
     setLoading(true);
-    const { data } = await supabase.from("mercha").select("*").eq("edicio", edicio).order("dia");
+    const { data } = await supabase.from("mercha").select("*").eq("edicio", edicio);
     setRows(data || []);
     setLoading(false);
   };
 
   useEffect(() => {
     carregar();
+    setDiesExtra([]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [edicio]);
 
-  const afegirDia = async () => {
-    if (!novaData) return;
-    await supabase.from("mercha").insert({
-      edicio,
-      dia: novaData,
-      article: ARTICLES_MERCHA[0],
-      quantitat: null,
-      total: 0,
-    });
-    setNovaData("");
-    carregar();
-  };
+  const diesDB = Array.from(new Set(rows.map((r) => r.dia)));
+  const nomsDies = Array.from(new Set([...DIES_BASE, ...diesDB, ...diesExtra]));
 
-  const grups = rows.reduce((acc: Record<string, any[]>, r) => {
-    const key = r.dia || "";
-    if (!acc[key]) acc[key] = [];
-    acc[key].push(r);
-    return acc;
-  }, {});
+  const afegirDia = () => setDiesExtra([...diesExtra, `Dia ${nomsDies.length}`]);
 
-  const totalsPerArticle: Record<string, number> = {};
-  ARTICLES_MERCHA.forEach((a) => { totalsPerArticle[a] = 0; });
-  rows.forEach((r) => { totalsPerArticle[r.article] = (totalsPerArticle[r.article] || 0) + Number(r.total || 0); });
+  const totalGeneral = rows.reduce((s, r) => s + Number(r.total || 0), 0);
+  const totalsPerProducte: Record<string, number> = {};
+  NOMS_BASE.forEach((n) => { totalsPerProducte[n] = 0; });
+  rows.forEach((r) => { totalsPerProducte[r.article] = (totalsPerProducte[r.article] || 0) + Number(r.total || 0); });
 
   if (loading) return <p className="empty">Carregant…</p>;
 
   return (
     <div>
-      <div className="grid" style={{ marginBottom: 16 }}>
-        {Object.keys(grups).sort().map((dia) => (
-          <DiaGroup key={dia} dia={dia} linies={grups[dia]} onRefresh={carregar} />
+      <div className="link-line">
+        <div><span className="dim">Total mercha:</span> <b>{fmt(totalGeneral)}</b></div>
+      </div>
+
+      <div className="grid">
+        {nomsDies.map((nom) => (
+          <DiaCard
+            key={nom}
+            edicio={edicio}
+            nom={nom}
+            files={rows.filter((r) => r.dia === nom)}
+            onRenamed={() => { carregar(); }}
+            onDeleted={() => { setDiesExtra(diesExtra.filter((d) => d !== nom)); carregar(); }}
+            onRefresh={carregar}
+          />
         ))}
       </div>
 
-      <div className="linia" style={{ maxWidth: 300, marginBottom: 24 }}>
-        <input type="date" value={novaData} onChange={(e) => setNovaData(e.target.value)} />
-        <button className="btn" onClick={afegirDia}>+ Afegir dia</button>
-      </div>
+      <button className="btn" onClick={afegirDia}>+ Afegir dia</button>
 
-      <div className="eyebrow" style={{ marginTop: 8 }}>Referència per article (real 2026)</div>
+      <div className="eyebrow" style={{ marginTop: 28 }}>Comparativa per producte</div>
       <table>
-        <thead><tr><th>Article</th><th>2026 (referència)</th><th>2027 (fins ara)</th></tr></thead>
+        <thead><tr><th>Producte</th><th>2026 (real)</th><th>2027 (real, fins ara)</th></tr></thead>
         <tbody>
-          {ARTICLES_MERCHA.map((a) => (
-            <tr key={a}>
-              <td>{a}</td>
-              <td className="dim">{fmt(REFERENCIA_2026[a] || 0)}</td>
-              <td style={{ color: "var(--accent-amber)" }}>{fmt(totalsPerArticle[a] || 0)}</td>
+          {NOMS_BASE.map((n) => (
+            <tr key={n}>
+              <td>{n}</td>
+              <td className="dim">{fmt(REFERENCIA_2026[n] || 0)}</td>
+              <td style={{ color: "var(--accent-amber)" }}>{fmt(totalsPerProducte[n] || 0)}</td>
             </tr>
           ))}
         </tbody>

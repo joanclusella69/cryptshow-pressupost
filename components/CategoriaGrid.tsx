@@ -35,17 +35,15 @@ export default function CategoriaGrid({ edicio, tipus, categories, refreshKey }:
     setMovIds(ids);
 
     if (tipus === "ingres") {
-      const [pub, ent, mer, altres] = await Promise.all([
+      const [pub, dies, altres] = await Promise.all([
         supabase.from("publicitat").select("confirmat").eq("edicio", edicio),
-        supabase.from("entrades").select("caixa, web").eq("edicio", edicio),
-        supabase.from("mercha").select("total").eq("edicio", edicio),
+        supabase.from("cryptshow_dies").select("entrades, mercha").eq("edicio", edicio),
         supabase.from("cryptshow_altres").select("import").eq("edicio", edicio),
       ]);
       r["Publicitat i patrocinadors"] = (pub.data || []).reduce((s: number, p: any) => s + Number(p.confirmat || 0), 0);
-      const totalEntrades = (ent.data || []).reduce((s: number, e: any) => s + Number(e.caixa || 0) + Number(e.web || 0), 0);
-      const totalMercha = (mer.data || []).reduce((s: number, m: any) => s + Number(m.total || 0), 0);
+      const totalDies = (dies.data || []).reduce((s: number, d: any) => s + Number(d.entrades || 0) + Number(d.mercha || 0), 0);
       const totalAltres = (altres.data || []).reduce((s: number, a: any) => s + Number(a.import || 0), 0);
-      r["Aportació Cryptshow"] = totalEntrades + totalMercha + totalAltres;
+      r["Aportació Cryptshow"] = totalDies + totalAltres;
     }
 
     const p: Record<string, number> = {};

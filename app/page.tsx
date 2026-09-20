@@ -22,11 +22,27 @@ function Stat({ label, value }: { label: string; value: string }) {
   );
 }
 
+function Bloc({ titol, ingressos, despeses, fmt }: { titol: string; ingressos: number; despeses: number; fmt: (n: number) => string }) {
+  const balanc = ingressos - despeses;
+  return (
+    <>
+      <div className="eyebrow" style={{ marginBottom: 8 }}>{titol}</div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 16, marginBottom: 16 }}>
+        <Stat label="Ingressos" value={fmt(ingressos)} />
+        <Stat label="Despeses" value={fmt(despeses)} />
+      </div>
+      <div style={{ marginBottom: 32 }}>
+        <Stat label={`Balanç ${titol.toLowerCase()}`} value={fmt(balanc)} />
+      </div>
+    </>
+  );
+}
+
 export default function ResumPage() {
   const [edicio, setEdicio] = useState(EDICIONS[0]);
   const [loading, setLoading] = useState(true);
-  const [stats, setStats] = useState({ ingressos: 0, despeses: 0, aportacioCryptshow: 0, publicitat: 0 });
-  const [previst, setPrevist] = useState({ ingressos: 0, despeses: 0, aportacioCryptshow: 0, publicitat: 0 });
+  const [real, setReal] = useState({ ingressos: 0, despeses: 0 });
+  const [previst, setPrevist] = useState({ ingressos: 0, despeses: 0 });
 
   useEffect(() => {
     const carregar = async () => {
@@ -37,30 +53,28 @@ export default function ResumPage() {
         supabase.from("cryptshow_dies").select("entrades").eq("edicio", edicio),
         supabase.from("cryptshow_altres").select("import").eq("edicio", edicio),
         supabase.from("mercha").select("total").eq("edicio", edicio),
-        supabase.from("previstos").select("tipus, categoria, previst").eq("edicio", edicio),
+        supabase.from("previstos").select("tipus, previst").eq("edicio", edicio),
       ]);
-      const ingressos = (mov.data || []).filter((m) => m.tipus === "ingres").reduce((s, m) => s + Number(m.real || 0), 0);
+
+      const ingressosManual = (mov.data || []).filter((m) => m.tipus === "ingres").reduce((s, m) => s + Number(m.real || 0), 0);
       const despeses = (mov.data || []).filter((m) => m.tipus === "despesa").reduce((s, m) => s + Number(m.real || 0), 0);
       const publicitat = (pub.data || []).reduce((s, p) => s + Number(p.confirmat || 0), 0);
       const totalEntrades = (dies.data || []).reduce((s, d) => s + Number(d.entrades || 0), 0);
       const totalMercha = (mer.data || []).reduce((s, m) => s + Number(m.total || 0), 0);
       const totalAltres = (altres.data || []).reduce((s, a) => s + Number(a.import || 0), 0);
-      setStats({ ingressos, despeses, aportacioCryptshow: totalEntrades + totalMercha + totalAltres, publicitat });
+      const aportacioCryptshow = totalEntrades + totalMercha + totalAltres;
+      setReal({ ingressos: ingressosManual + publicitat + aportacioCryptshow, despeses });
 
       const previstos = prev.data || [];
       const ingressosPrevist = previstos.filter((p) => p.tipus === "ingres").reduce((s, p) => s + Number(p.previst || 0), 0);
       const despesesPrevist = previstos.filter((p) => p.tipus === "despesa").reduce((s, p) => s + Number(p.previst || 0), 0);
-      const aportacioPrevist = previstos.find((p) => p.categoria === "Aportació Cryptshow")?.previst || 0;
-      const publicitatPrevist = previstos.find((p) => p.categoria === "Publicitat i patrocinadors")?.previst || 0;
-      setPrevist({ ingressos: ingressosPrevist, despeses: despesesPrevist, aportacioCryptshow: Number(aportacioPrevist), publicitat: Number(publicitatPrevist) });
+      setPrevist({ ingressos: ingressosPrevist, despeses: despesesPrevist });
 
       setLoading(false);
     };
     carregar();
   }, [edicio]);
 
-  const balanc = stats.ingressos + stats.aportacioCryptshow + stats.publicitat - stats.despeses;
-  const balancPrevist = previst.ingressos + previst.aportacioCryptshow + previst.publicitat - previst.despeses;
   const fmt = (n: number) => `${n.toLocaleString("ca-ES")} €`;
 
   return (
@@ -88,29 +102,10 @@ export default function ResumPage() {
         <p className="empty">Carregant…</p>
       ) : (
         <>
-          <div className="eyebrow" style={{ marginBottom: 0 }}>Previst</div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 16, margin: "8px 0 16px" }}>
-            <Stat label="Ingressos previstos" value={fmt(previst.ingressos)} />
-            <Stat label="Despeses previstes" value={fmt(previst.despeses)} />
-            <Stat label="Aportació Cryptshow (previst)" value={fmt(previst.aportacioCryptshow)} />
-            <Stat label="Publicitat (previst)" value={fmt(previst.publicitat)} />
-          </div>
-          <div style={{ marginBottom: 32 }}>
-            <Stat label="Balanç total (previst)" value={fmt(balancPrevist)} />
-          </div>
-
-          <div className="eyebrow" style={{ marginBottom: 0 }}>Real</div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 16, margin: "8px 0 16px" }}>
-            <Stat label="Ingressos generals" value={fmt(stats.ingressos)} />
-            <Stat label="Despeses generals" value={fmt(stats.despeses)} />
-            <Stat label="Aportació Cryptshow" value={fmt(stats.aportacioCryptshow)} />
-            <Stat label="Publicitat confirmada" value={fmt(stats.publicitat)} />
-          </div>
-          <div style={{ marginBottom: 16 }}>
-            <Stat label="Balanç total (real)" value={fmt(balanc)} />
-          </div>
+          <Bloc titol="Previst" ingressos={previst.ingressos} despeses={previst.despeses} fmt={fmt} />
+          <Bloc titol="Real" ingressos={real.ingressos} despeses={real.despeses} fmt={fmt} />
           <p className="empty">
-            Balanç = ingressos + aportació Cryptshow + publicitat − despeses, per a l'edició seleccionada.
+            "Ingressos" ja suma totes les partides (Ajuntament, The Crypts, Aportació Cryptshow, Publicitat i Plataformes).
           </p>
         </>
       )}

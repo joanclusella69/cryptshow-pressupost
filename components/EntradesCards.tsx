@@ -12,10 +12,10 @@ function entradesPropiesSessio(s: any) {
   return Number(s.unitats_taquilla || 0) + Number(s.unitats_web || 0);
 }
 
-function CampPreu({ value, onChange, onBlur }: { value: any; onChange: (e: any) => void; onBlur: () => void }) {
+function CampPreu({ value, onChange }: { value: any; onChange: (v: any) => void }) {
   return (
     <span className="input-eur">
-      <input type="number" placeholder="0" value={value ?? ""} onChange={onChange} onBlur={onBlur} />
+      <input type="number" placeholder="0" value={value ?? ""} onChange={(e) => onChange(e.target.value)} />
       <span className="eur-suffix">€</span>
     </span>
   );
@@ -23,6 +23,7 @@ function CampPreu({ value, onChange, onBlur }: { value: any; onChange: (e: any) 
 
 function RefInput({ valor, onDesar }: { valor: number | null; onDesar: (v: number) => void }) {
   const [v, setV] = useState(valor ?? "");
+  useEffect(() => setV(valor ?? ""), [valor]);
   return (
     <input
       type="number"
@@ -35,74 +36,40 @@ function RefInput({ valor, onDesar }: { valor: number | null; onDesar: (v: numbe
   );
 }
 
-function SessioRow({ s, onSave, onDelete, refValor, onRefSave }: any) {
-  const [local, setLocal] = useState(s);
-  const desar = async (camp: string, valor: any) => {
-    const nou = { ...local, [camp]: valor };
-    setLocal(nou);
-    await onSave(s.id, { [camp]: valor });
-  };
-
+function SessioRow({ s, onChange, onDelete, refValor, onRefSave }: any) {
   return (
     <div className="sessio-bloc">
       <div className="linia">
-        <input style={{ flex: 1.6 }} placeholder="Nom sessió" value={local.nom || ""} onChange={(e) => setLocal({ ...local, nom: e.target.value })} onBlur={(e) => desar("nom", e.target.value)} />
+        <input style={{ flex: 1.6 }} placeholder="Nom sessió" value={s.nom || ""} onChange={(e) => onChange(s.id, "nom", e.target.value)} />
         <label className="boost-check" title="Els abonaments sumen assistents aquí">
-          <input type="checkbox" checked={!!local.boost_abonament} onChange={(e) => { setLocal({ ...local, boost_abonament: e.target.checked }); desar("boost_abonament", e.target.checked); }} />
+          <input type="checkbox" checked={!!s.boost_abonament} onChange={(e) => onChange(s.id, "boost_abonament", e.target.checked)} />
           abon.
         </label>
         <button className="link-btn" onClick={() => onDelete(s.id)}>×</button>
       </div>
       <div className="linia">
         <span className="mini-lbl">Taquilla</span>
-        <input type="number" placeholder="uds" value={local.unitats_taquilla ?? ""} onChange={(e) => setLocal({ ...local, unitats_taquilla: e.target.value })} onBlur={(e) => desar("unitats_taquilla", Number(e.target.value) || 0)} />
-        <CampPreu value={local.preu_taquilla} onChange={(e) => setLocal({ ...local, preu_taquilla: e.target.value })} onBlur={() => desar("preu_taquilla", Number(local.preu_taquilla) || 0)} />
+        <input type="number" placeholder="uds" value={s.unitats_taquilla ?? ""} onChange={(e) => onChange(s.id, "unitats_taquilla", e.target.value === "" ? "" : Number(e.target.value))} />
+        <CampPreu value={s.preu_taquilla} onChange={(v) => onChange(s.id, "preu_taquilla", v === "" ? "" : Number(v))} />
         <span className="mini-lbl">Web</span>
-        <input type="number" placeholder="uds" value={local.unitats_web ?? ""} onChange={(e) => setLocal({ ...local, unitats_web: e.target.value })} onBlur={(e) => desar("unitats_web", Number(e.target.value) || 0)} />
-        <CampPreu value={local.preu_web} onChange={(e) => setLocal({ ...local, preu_web: e.target.value })} onBlur={() => desar("preu_web", Number(local.preu_web) || 0)} />
+        <input type="number" placeholder="uds" value={s.unitats_web ?? ""} onChange={(e) => onChange(s.id, "unitats_web", e.target.value === "" ? "" : Number(e.target.value))} />
+        <CampPreu value={s.preu_web} onChange={(v) => onChange(s.id, "preu_web", v === "" ? "" : Number(v))} />
       </div>
       <div className="resum-sessio">
+        <span>{fmt(eurosSessio(s))} · {entradesPropiesSessio(s)} ent.</span>
         <span>2026: <RefInput valor={refValor} onDesar={onRefSave} /></span>
       </div>
     </div>
   );
 }
 
-function DiaCard({ dia, entradesAbonFestival, onRenamed, onDelete, onMoure, esPrimer, esUltim, onRefresh }: any) {
-  const [nom, setNom] = useState(dia.nom);
-
-  const renombrar = async () => {
-    if (nom !== dia.nom) {
-      await supabase.from("entrades_dies").update({ nom }).eq("id", dia.id);
-      onRenamed();
-    }
-  };
-
-  const afegirSessio = async () => {
-    await supabase.from("entrades_sessions").insert({ dia_id: dia.id, nom: "", ordre: dia.sessions.length });
-    onRefresh();
-  };
-  const eliminarSessio = async (id: string) => {
-    await supabase.from("entrades_sessions").delete().eq("id", id);
-    onRefresh();
-  };
-  const desarSessio = async (id: string, camps: any) => {
-    await supabase.from("entrades_sessions").update(camps).eq("id", id);
-    onRefresh();
-  };
-
-  const [abonUnitats, setAbonUnitats] = useState(dia.abonament_unitats ?? "");
-  const [abonPreu, setAbonPreu] = useState(dia.abonament_preu ?? 8);
-  const desarAbonament = async (camp: string, valor: any) => {
-    await supabase.from("entrades_dies").update({ [camp]: valor }).eq("id", dia.id);
-    onRefresh();
-  };
-
-  const abonEuros = dia.te_abonaments ? Number(abonUnitats || 0) * Number(abonPreu || 0) : 0;
+function DiaCard({ dia, entradesAbonFestival, onRenameDia, onRenameDiaBlur, onDeleteDia, onMoure, esPrimer, esUltim, onSessioChange, onSessioAdd, onSessioDelete, onAbonamentChange, referencies, onRefSave }: any) {
+  const abonUnitats = dia.te_abonaments ? Number(dia.abonament_unitats || 0) : 0;
+  const abonEuros = dia.te_abonaments ? abonUnitats * Number(dia.abonament_preu || 0) : 0;
   const eurosSessions = dia.sessions.reduce((s: number, x: any) => s + eurosSessio(x), 0);
   const totalDia = eurosSessions + abonEuros;
   const totalEntradesDia = dia.sessions.reduce(
-    (s: number, x: any) => s + entradesPropiesSessio(x) + (x.boost_abonament ? Number(abonUnitats || 0) + entradesAbonFestival : 0),
+    (s: number, x: any) => s + entradesPropiesSessio(x) + (x.boost_abonament ? abonUnitats + entradesAbonFestival : 0),
     0
   );
 
@@ -113,8 +80,8 @@ function DiaCard({ dia, entradesAbonFestival, onRenamed, onDelete, onMoure, esPr
           <button className="link-btn" disabled={esPrimer} onClick={() => onMoure(-1)}>▲</button>
           <button className="link-btn" disabled={esUltim} onClick={() => onMoure(1)}>▼</button>
         </div>
-        <input className="dia-nom" value={nom} onChange={(e) => setNom(e.target.value)} onBlur={renombrar} />
-        <button className="link-btn" onClick={() => onDelete(dia.id)}>×</button>
+        <input className="dia-nom" value={dia.nom} onChange={(e) => onRenameDia(dia.id, e.target.value)} onBlur={(e) => onRenameDiaBlur(dia.id, e.target.value)} />
+        <button className="link-btn" onClick={() => onDeleteDia(dia.id)}>×</button>
       </div>
       <div className="dia-total-linia">{fmt(totalDia)} · {totalEntradesDia} ent.</div>
 
@@ -124,29 +91,29 @@ function DiaCard({ dia, entradesAbonFestival, onRenamed, onDelete, onMoure, esPr
         <SessioRow
           key={s.id}
           s={s}
-          onSave={desarSessio}
-          onDelete={eliminarSessio}
-          refValor={dia.referencies[`dia:${dia.nom}|sessio:${s.nom}`] ?? null}
-          onRefSave={(v: number) => dia.onRefSave(`dia:${dia.nom}|sessio:${s.nom}`, v)}
+          onChange={(id: string, camp: string, valor: any) => onSessioChange(dia.id, id, camp, valor)}
+          onDelete={(id: string) => onSessioDelete(dia.id, id)}
+          refValor={referencies[`dia:${dia.nom}|sessio:${s.nom}`] ?? null}
+          onRefSave={(v: number) => onRefSave(`dia:${dia.nom}|sessio:${s.nom}`, v)}
         />
       ))}
-      <button className="add-linia" onClick={afegirSessio}>+ afegir sessió</button>
+      <button className="add-linia" onClick={() => onSessioAdd(dia.id)}>+ afegir sessió</button>
 
       {dia.te_abonaments && (
         <div className="abonaments-box">
           <div className="eyebrow-mini">Abonaments d'aquest dia</div>
           <div className="linia">
             <span className="mini-lbl">Uds</span>
-            <input type="number" placeholder="0" value={abonUnitats} onChange={(e) => setAbonUnitats(e.target.value as any)} onBlur={() => desarAbonament("abonament_unitats", Number(abonUnitats) || 0)} />
+            <input type="number" placeholder="0" value={dia.abonament_unitats ?? ""} onChange={(e) => onAbonamentChange(dia.id, "abonament_unitats", e.target.value === "" ? "" : Number(e.target.value))} />
             <span className="mini-lbl">Preu</span>
-            <CampPreu value={abonPreu} onChange={(e) => setAbonPreu(e.target.value as any)} onBlur={() => desarAbonament("abonament_preu", Number(abonPreu) || 0)} />
+            <CampPreu value={dia.abonament_preu} onChange={(v) => onAbonamentChange(dia.id, "abonament_preu", v === "" ? "" : Number(v))} />
           </div>
           <p className="nota">Suma {abonUnitats || 0} assistent(s) a cada sessió marcada "abon." (menys Infantil, si no la marques), sense sumar-hi € (ja compta aquí, un sol cop).</p>
         </div>
       )}
 
       <div className="dia-ref-linia">
-        Referència 2026 d'aquest dia: <RefInput valor={dia.referencies[`dia:${dia.nom}`] ?? null} onDesar={(v) => dia.onRefSave(`dia:${dia.nom}`, v)} />
+        Referència 2026 d'aquest dia: <RefInput valor={referencies[`dia:${dia.nom}`] ?? null} onDesar={(v) => onRefSave(`dia:${dia.nom}`, v)} />
       </div>
     </div>
   );
@@ -158,73 +125,107 @@ export default function EntradesCards({ edicio }: { edicio: string }) {
   const [referencies, setReferencies] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
 
-  const carregar = async () => {
-    setLoading(true);
-    const [d, s, c, r] = await Promise.all([
-      supabase.from("entrades_dies").select("*").eq("edicio", edicio).order("ordre"),
-      supabase.from("entrades_sessions").select("*").order("ordre"),
-      supabase.from("entrades_config").select("*").eq("edicio", edicio).maybeSingle(),
-      supabase.from("referencies_2026").select("*").eq("edicio", edicio),
-    ]);
-
-    let diesData = d.data || [];
-    if (diesData.length === 0) {
-      const base = [
-        { edicio, nom: "Previ", ordre: 0, te_abonaments: false },
-        { edicio, nom: "Concert", ordre: 1, te_abonaments: true },
-        { edicio, nom: "Dia 1", ordre: 2, te_abonaments: true },
-        { edicio, nom: "Dia 2", ordre: 3, te_abonaments: true },
-      ];
-      const { data: creats } = await supabase.from("entrades_dies").insert(base).select();
-      diesData = creats || [];
-    }
-
-    let configData = c.data;
-    if (!configData) {
-      const { data: creat } = await supabase.from("entrades_config").insert({ edicio, festival_unitats: 0, festival_preu: 25 }).select().single();
-      configData = creat;
-    }
-
-    const refs: Record<string, number> = {};
-    (r.data || []).forEach((row: any) => { refs[row.clau] = Number(row.valor || 0); });
-
-    const totesSessions = s.data || [];
-    setDies(diesData.map((dd: any) => ({ ...dd, sessions: totesSessions.filter((ss: any) => ss.dia_id === dd.id) })));
-    setConfig(configData);
-    setReferencies(refs);
-    setLoading(false);
-  };
-
   useEffect(() => {
+    const carregar = async () => {
+      setLoading(true);
+      const [d, s, c, r] = await Promise.all([
+        supabase.from("entrades_dies").select("*").eq("edicio", edicio).order("ordre"),
+        supabase.from("entrades_sessions").select("*").order("ordre"),
+        supabase.from("entrades_config").select("*").eq("edicio", edicio).maybeSingle(),
+        supabase.from("referencies_2026").select("*").eq("edicio", edicio),
+      ]);
+
+      let diesData = d.data || [];
+      if (diesData.length === 0) {
+        const base = [
+          { edicio, nom: "Previ", ordre: 0, te_abonaments: false },
+          { edicio, nom: "Concert", ordre: 1, te_abonaments: true },
+          { edicio, nom: "Dia 1", ordre: 2, te_abonaments: true },
+          { edicio, nom: "Dia 2", ordre: 3, te_abonaments: true },
+        ];
+        const { data: creats } = await supabase.from("entrades_dies").insert(base).select();
+        diesData = creats || [];
+      }
+
+      let configData = c.data;
+      if (!configData) {
+        const { data: creat } = await supabase.from("entrades_config").insert({ edicio, festival_unitats: 0, festival_preu: 25 }).select().single();
+        configData = creat;
+      }
+
+      const refs: Record<string, number> = {};
+      (r.data || []).forEach((row: any) => { refs[row.clau] = Number(row.valor || 0); });
+
+      const totesSessions = s.data || [];
+      setDies(diesData.map((dd: any) => ({ ...dd, sessions: totesSessions.filter((ss: any) => ss.dia_id === dd.id) })));
+      setConfig(configData);
+      setReferencies(refs);
+      setLoading(false);
+    };
     carregar();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [edicio]);
 
-  const desarReferencia = async (clau: string, valor: number) => {
-    await supabase.from("referencies_2026").upsert({ edicio, clau, valor }, { onConflict: "edicio,clau" });
-    setReferencies({ ...referencies, [clau]: valor });
+  // ── Sessions: canvi instantani en local, desat en segon pla ──
+  const onSessioChange = (diaId: string, sessionId: string, camp: string, valor: any) => {
+    setDies((prev) =>
+      prev.map((d) =>
+        d.id !== diaId ? d : { ...d, sessions: d.sessions.map((s: any) => (s.id === sessionId ? { ...s, [camp]: valor } : s)) }
+      )
+    );
+    supabase.from("entrades_sessions").update({ [camp]: valor === "" ? null : valor }).eq("id", sessionId);
+  };
+
+  const onSessioAdd = async (diaId: string) => {
+    const dia = dies.find((d) => d.id === diaId);
+    const { data } = await supabase.from("entrades_sessions").insert({ dia_id: diaId, nom: "", ordre: dia?.sessions.length || 0 }).select().single();
+    if (data) setDies((prev) => prev.map((d) => (d.id !== diaId ? d : { ...d, sessions: [...d.sessions, data] })));
+  };
+
+  const onSessioDelete = (diaId: string, sessionId: string) => {
+    setDies((prev) => prev.map((d) => (d.id !== diaId ? d : { ...d, sessions: d.sessions.filter((s: any) => s.id !== sessionId) })));
+    supabase.from("entrades_sessions").delete().eq("id", sessionId);
+  };
+
+  const onAbonamentChange = (diaId: string, camp: string, valor: any) => {
+    setDies((prev) => prev.map((d) => (d.id !== diaId ? d : { ...d, [camp]: valor })));
+    supabase.from("entrades_dies").update({ [camp]: valor === "" ? null : valor }).eq("id", diaId);
+  };
+
+  const onRenameDia = (diaId: string, nom: string) => {
+    setDies((prev) => prev.map((d) => (d.id !== diaId ? d : { ...d, nom })));
+  };
+  const onRenameDiaBlur = (diaId: string, nom: string) => {
+    supabase.from("entrades_dies").update({ nom }).eq("id", diaId);
+  };
+
+  const onDeleteDia = (diaId: string) => {
+    setDies((prev) => prev.filter((d) => d.id !== diaId));
+    supabase.from("entrades_dies").delete().eq("id", diaId);
   };
 
   const afegirDia = async () => {
     const { data } = await supabase.from("entrades_dies").insert({ edicio, nom: `Dia ${dies.length}`, ordre: dies.length, te_abonaments: true }).select().single();
     if (data) setDies([...dies, { ...data, sessions: [] }]);
   };
-  const eliminarDia = async (id: string) => {
-    await supabase.from("entrades_dies").delete().eq("id", id);
-    setDies(dies.filter((d) => d.id !== id));
-  };
-  const moureDia = async (idx: number, dir: number) => {
-    const noves = [...dies];
-    const [item] = noves.splice(idx, 1);
-    noves.splice(idx + dir, 0, item);
-    setDies(noves);
-    await Promise.all(noves.map((d, i) => supabase.from("entrades_dies").update({ ordre: i }).eq("id", d.id)));
+
+  const moureDia = (idx: number, dir: number) => {
+    setDies((prev) => {
+      const noves = [...prev];
+      const [item] = noves.splice(idx, 1);
+      noves.splice(idx + dir, 0, item);
+      Promise.all(noves.map((d, i) => supabase.from("entrades_dies").update({ ordre: i }).eq("id", d.id)));
+      return noves;
+    });
   };
 
-  const desarConfig = async (camp: string, valor: any) => {
-    const nou = { ...config, [camp]: valor };
-    setConfig(nou);
-    await supabase.from("entrades_config").update({ [camp]: valor }).eq("edicio", edicio);
+  const desarReferencia = (clau: string, valor: number) => {
+    setReferencies((prev) => ({ ...prev, [clau]: valor }));
+    supabase.from("referencies_2026").upsert({ edicio, clau, valor }, { onConflict: "edicio,clau" });
+  };
+
+  const desarConfig = (camp: string, valor: any) => {
+    setConfig((prev: any) => ({ ...prev, [camp]: valor }));
+    supabase.from("entrades_config").update({ [camp]: valor === "" ? null : valor }).eq("edicio", edicio);
   };
 
   const entradesAbonFestival = Number(config.festival_unitats || 0);
@@ -246,8 +247,6 @@ export default function EntradesCards({ edicio }: { edicio: string }) {
 
   if (loading) return <p className="empty">Carregant…</p>;
 
-  const diesAmbRef = dies.map((d) => ({ ...d, referencies, onRefSave: desarReferencia }));
-
   return (
     <div>
       <div className="link-line">
@@ -256,17 +255,23 @@ export default function EntradesCards({ edicio }: { edicio: string }) {
       </div>
 
       <div className="grid">
-        {diesAmbRef.map((d, idx) => (
+        {dies.map((d, idx) => (
           <DiaCard
             key={d.id}
             dia={d}
             entradesAbonFestival={entradesAbonFestival}
-            onRenamed={carregar}
-            onDelete={eliminarDia}
+            onRenameDia={onRenameDia}
+            onRenameDiaBlur={onRenameDiaBlur}
+            onDeleteDia={onDeleteDia}
             onMoure={(dir: number) => moureDia(idx, dir)}
             esPrimer={idx === 0}
             esUltim={idx === dies.length - 1}
-            onRefresh={carregar}
+            onSessioChange={onSessioChange}
+            onSessioAdd={onSessioAdd}
+            onSessioDelete={onSessioDelete}
+            onAbonamentChange={onAbonamentChange}
+            referencies={referencies}
+            onRefSave={desarReferencia}
           />
         ))}
       </div>
@@ -277,9 +282,9 @@ export default function EntradesCards({ edicio }: { edicio: string }) {
         <div className="eyebrow-mini">Abonament Tot Festival</div>
         <div className="linia">
           <span className="mini-lbl">Uds</span>
-          <input type="number" placeholder="0" value={config.festival_unitats ?? ""} onChange={(e) => setConfig({ ...config, festival_unitats: e.target.value })} onBlur={(e: any) => desarConfig("festival_unitats", Number(e.target.value) || 0)} />
+          <input type="number" placeholder="0" value={config.festival_unitats ?? ""} onChange={(e) => desarConfig("festival_unitats", e.target.value === "" ? "" : Number(e.target.value))} />
           <span className="mini-lbl">Preu</span>
-          <CampPreu value={config.festival_preu} onChange={(e) => setConfig({ ...config, festival_preu: e.target.value })} onBlur={() => desarConfig("festival_preu", Number(config.festival_preu) || 0)} />
+          <CampPreu value={config.festival_preu} onChange={(v) => desarConfig("festival_preu", v === "" ? "" : Number(v))} />
         </div>
         <p className="nota">{entradesAbonFestival} assistent(s) sumen a cada sessió marcada "abon." de tots els dies. El valor ({fmt(eurosAbonFestival)}) no s'atribueix a cap dia — engreix directament el total de l'edició.</p>
         <div className="dia-ref-linia">

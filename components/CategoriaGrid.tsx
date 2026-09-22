@@ -37,13 +37,13 @@ export default function CategoriaGrid({ edicio, tipus, categories, refreshKey }:
 
     if (tipus === "ingres") {
       const [pub, dies, altres, mer, totalEntrades] = await Promise.all([
-        supabase.from("publicitat").select("confirmat").eq("edicio", edicio),
+        supabase.from("publicitat").select("confirmat, cobrat").eq("edicio", edicio),
         supabase.from("cryptshow_dies").select("entrades").eq("edicio", edicio),
         supabase.from("cryptshow_altres").select("import").eq("edicio", edicio),
         supabase.from("mercha").select("total").eq("edicio", edicio),
         getTotalEntrades(edicio),
       ]);
-      r["Publicitat i patrocinadors"] = (pub.data || []).reduce((s: number, p: any) => s + Number(p.confirmat || 0), 0);
+      r["Publicitat i patrocinadors"] = (pub.data || []).filter((p: any) => p.cobrat).reduce((s: number, p: any) => s + Number(p.confirmat || 0), 0);
       const totalMercha = (mer.data || []).reduce((s: number, m: any) => s + Number(m.total || 0), 0);
       const totalAltres = (altres.data || []).reduce((s: number, a: any) => s + Number(a.import || 0), 0);
       r["Aportació Cryptshow"] = totalEntrades + totalMercha + totalAltres;

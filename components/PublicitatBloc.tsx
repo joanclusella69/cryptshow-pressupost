@@ -233,6 +233,7 @@ export default function PublicitatBloc({ edicio }: { edicio: string }) {
 
   const totalConfirmat = sponsors.reduce((s, r) => s + Number(r.confirmat || 0), 0);
   const totalPrevist = sponsors.reduce((s, r) => s + Number(r.previst || 0), 0);
+  const totalCobrat = sponsors.filter((r) => r.cobrat).reduce((s, r) => s + Number(r.confirmat || 0), 0);
 
   if (loading) return <p className="empty">Carregant…</p>;
 
@@ -241,7 +242,8 @@ export default function PublicitatBloc({ edicio }: { edicio: string }) {
       <div className="link-line">
         <div><span className="dim">Total previst:</span> <b>{fmt(totalPrevist)}</b></div>
         <div><span className="dim">Total confirmat:</span> <b>{fmt(totalConfirmat)}</b></div>
-        <div className="dim">→ aquest confirmat és el <b style={{ color: "var(--accent-amber)" }}>Real</b> de "Publicitat i patrocinadors" a Ingressos</div>
+        <div><span className="dim">Total cobrat:</span> <b style={{ color: "var(--accent-amber)" }}>{fmt(totalCobrat)}</b></div>
+        <div className="dim">→ el cobrat és el <b style={{ color: "var(--accent-amber)" }}>Real</b> de "Publicitat i patrocinadors" a Ingressos</div>
       </div>
 
       {sponsors.length === 0 ? (

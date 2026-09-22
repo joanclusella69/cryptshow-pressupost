@@ -182,7 +182,28 @@ export default function PublicitatBloc({ edicio }: { edicio: string }) {
   const carregar = async () => {
     setLoading(true);
     const { data } = await supabase.from("publicitat").select("*").eq("edicio", edicio).order("created_at");
-    setSponsors(data || []);
+    let sponsorsData = data || [];
+    if (sponsorsData.length === 0) {
+      const inicials = [
+        { edicio, anunciant: "La Donzella", previst: 600, confirmat: 600, estat: "Igual que any anterior", encarregat: "Joan", cobrat: true },
+        { edicio, anunciant: "Oscar", previst: 100, confirmat: 100, estat: "Igual que any anterior", encarregat: "Joan", cobrat: true },
+        { edicio, anunciant: "Mexclat", previst: 250, confirmat: 250, estat: "Igual que any anterior", encarregat: "David", cobrat: false },
+        { edicio, anunciant: "Caño 14", previst: 100, confirmat: 100, estat: "Igual que any anterior", encarregat: "Joan", cobrat: true },
+        { edicio, anunciant: "La màquina del temps", previst: 65, confirmat: 0, estat: "Demanat", encarregat: "Joan", cobrat: false },
+        { edicio, anunciant: "Farmàcia Villoria", previst: 100, confirmat: 100, estat: "Igual que any anterior", encarregat: "David", cobrat: true },
+        { edicio, anunciant: "Free Style", previst: 45, confirmat: 45, estat: "Igual que any anterior", encarregat: "Joan", cobrat: true },
+        { edicio, anunciant: "Casa Costa", previst: 100, confirmat: 100, estat: "Igual que any anterior", encarregat: "Sonia", cobrat: true },
+        { edicio, anunciant: "Calavera", previst: 45, confirmat: 45, estat: "Igual que any anterior", encarregat: "Toni", cobrat: false },
+        { edicio, anunciant: "Fimons", previst: 45, confirmat: 0, estat: "Pendent demanar", encarregat: "David", cobrat: false },
+        { edicio, anunciant: "Patxi", previst: 50, confirmat: 60, estat: "Igual que any anterior", encarregat: "David", cobrat: true },
+        { edicio, anunciant: "Estraperlo", previst: 1000, confirmat: 1000, estat: "Igual que any anterior", encarregat: "David", cobrat: true },
+        { edicio, anunciant: "Badamola", previst: 0, confirmat: 0, estat: "Pendent demanar", encarregat: "", cobrat: false },
+        { edicio, anunciant: "Solimar", previst: 0, confirmat: 0, estat: "Pendent demanar", encarregat: "", cobrat: false },
+      ];
+      const { data: creats } = await supabase.from("publicitat").insert(inicials).select();
+      sponsorsData = creats || [];
+    }
+    setSponsors(sponsorsData);
     setLoading(false);
   };
 

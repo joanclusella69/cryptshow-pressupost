@@ -182,7 +182,7 @@ export default function EntradesCards({ edicio }: { edicio: string }) {
         d.id !== diaId ? d : { ...d, sessions: d.sessions.map((s: any) => (s.id === sessionId ? { ...s, [camp]: valor } : s)) }
       )
     );
-    supabase.from("entrades_sessions").update({ [camp]: valor === "" ? null : valor }).eq("id", sessionId);
+    supabase.from("entrades_sessions").update({ [camp]: valor === "" ? null : valor }).eq("id", sessionId).then(() => {});
   };
 
   const onSessioAdd = async (diaId: string) => {
@@ -193,24 +193,24 @@ export default function EntradesCards({ edicio }: { edicio: string }) {
 
   const onSessioDelete = (diaId: string, sessionId: string) => {
     setDies((prev) => prev.map((d) => (d.id !== diaId ? d : { ...d, sessions: d.sessions.filter((s: any) => s.id !== sessionId) })));
-    supabase.from("entrades_sessions").delete().eq("id", sessionId);
+    supabase.from("entrades_sessions").delete().eq("id", sessionId).then(() => {});
   };
 
   const onAbonamentChange = (diaId: string, camp: string, valor: any) => {
     setDies((prev) => prev.map((d) => (d.id !== diaId ? d : { ...d, [camp]: valor })));
-    supabase.from("entrades_dies").update({ [camp]: valor === "" ? null : valor }).eq("id", diaId);
+    supabase.from("entrades_dies").update({ [camp]: valor === "" ? null : valor }).eq("id", diaId).then(() => {});
   };
 
   const onRenameDia = (diaId: string, nom: string) => {
     setDies((prev) => prev.map((d) => (d.id !== diaId ? d : { ...d, nom })));
   };
   const onRenameDiaBlur = (diaId: string, nom: string) => {
-    supabase.from("entrades_dies").update({ nom }).eq("id", diaId);
+    supabase.from("entrades_dies").update({ nom }).eq("id", diaId).then(() => {});
   };
 
   const onDeleteDia = (diaId: string) => {
     setDies((prev) => prev.filter((d) => d.id !== diaId));
-    supabase.from("entrades_dies").delete().eq("id", diaId);
+    supabase.from("entrades_dies").delete().eq("id", diaId).then(() => {});
   };
 
   const afegirDia = async () => {
@@ -230,12 +230,12 @@ export default function EntradesCards({ edicio }: { edicio: string }) {
 
   const desarReferencia = (clau: string, valor: number) => {
     setReferencies((prev) => ({ ...prev, [clau]: valor }));
-    supabase.from("referencies_2026").upsert({ edicio, clau, valor }, { onConflict: "edicio,clau" });
+    supabase.from("referencies_2026").upsert({ edicio, clau, valor }, { onConflict: "edicio,clau" }).then(() => {});
   };
 
   const desarConfig = (camp: string, valor: any) => {
     setConfig((prev: any) => ({ ...prev, [camp]: valor }));
-    supabase.from("entrades_config").update({ [camp]: valor === "" ? null : valor }).eq("edicio", edicio);
+    supabase.from("entrades_config").update({ [camp]: valor === "" ? null : valor }).eq("edicio", edicio).then(() => {});
   };
 
   const entradesAbonFestival = Number(config.festival_unitats || 0);

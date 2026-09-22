@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, Fragment } from "react";
 import { supabase } from "@/lib/supabaseClient";
 
 const fmt = (n: number) => `${Number(n || 0).toLocaleString("ca-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`;
@@ -36,7 +36,7 @@ function RefInput({ valor, onDesar }: { valor: number | null; onDesar: (v: numbe
   );
 }
 
-function SessioRow({ s, onChange, onDelete, refValor, onRefSave }: any) {
+function SessioRow({ s, onChange, onDelete }: any) {
   return (
     <div className="sessio-bloc">
       <div className="linia">
@@ -57,7 +57,6 @@ function SessioRow({ s, onChange, onDelete, refValor, onRefSave }: any) {
       </div>
       <div className="resum-sessio">
         <span>{fmt(eurosSessio(s))} · {entradesPropiesSessio(s)} ent.</span>
-        <span>2026: <RefInput valor={refValor} onDesar={onRefSave} /></span>
       </div>
     </div>
   );
@@ -93,8 +92,6 @@ function DiaCard({ dia, entradesAbonFestival, onRenameDia, onRenameDiaBlur, onDe
           s={s}
           onChange={(id: string, camp: string, valor: any) => onSessioChange(dia.id, id, camp, valor)}
           onDelete={(id: string) => onSessioDelete(dia.id, id)}
-          refValor={referencies[`dia:${dia.nom}|sessio:${s.nom}`] ?? null}
-          onRefSave={(v: number) => onRefSave(`dia:${dia.nom}|sessio:${s.nom}`, v)}
         />
       ))}
       <button className="add-linia" onClick={() => onSessioAdd(dia.id)}>+ afegir sessió</button>
@@ -111,10 +108,6 @@ function DiaCard({ dia, entradesAbonFestival, onRenameDia, onRenameDiaBlur, onDe
           <p className="nota">Suma {abonUnitats || 0} assistent(s) a cada sessió marcada "abon." (menys Infantil, si no la marques), sense sumar-hi € (ja compta aquí, un sol cop).</p>
         </div>
       )}
-
-      <div className="dia-ref-linia">
-        Referència 2026 d'aquest dia: <RefInput valor={referencies[`dia:${dia.nom}`] ?? null} onDesar={(v) => onRefSave(`dia:${dia.nom}`, v)} />
-      </div>
     </div>
   );
 }
@@ -136,15 +129,28 @@ export default function EntradesCards({ edicio }: { edicio: string }) {
       ]);
 
       let diesData = d.data || [];
+      let justSeeded = false;
       if (diesData.length === 0) {
+        justSeeded = true;
         const base = [
           { edicio, nom: "Previ", ordre: 0, te_abonaments: false },
-          { edicio, nom: "Concert", ordre: 1, te_abonaments: true },
-          { edicio, nom: "Dia 1", ordre: 2, te_abonaments: true },
-          { edicio, nom: "Dia 2", ordre: 3, te_abonaments: true },
+          { edicio, nom: "Concert", ordre: 1, te_abonaments: true, abonament_preu: 8 },
+          { edicio, nom: "Dia 1", ordre: 2, te_abonaments: true, abonament_preu: 8 },
+          { edicio, nom: "Dia 2", ordre: 3, te_abonaments: true, abonament_preu: 8 },
         ];
         const { data: creats } = await supabase.from("entrades_dies").insert(base).select();
         diesData = creats || [];
+
+        const trobar = (nom: string) => diesData.find((x: any) => x.nom === nom)?.id;
+        const sessionsInicials = [
+          { dia_id: trobar("Concert"), nom: "Concert Pel·lícula musicada", preu_taquilla: 10, preu_web: 5.4, boost_abonament: false, ordre: 0 },
+          { dia_id: trobar("Dia 1"), nom: "Sessió Infantil", preu_taquilla: 1, preu_web: 1, boost_abonament: false, ordre: 0 },
+          { dia_id: trobar("Dia 1"), nom: "Sessió Competició dia 1", preu_taquilla: 5, preu_web: 4.7, boost_abonament: true, ordre: 1 },
+          { dia_id: trobar("Dia 1"), nom: "Sessió LMPV", preu_taquilla: 5, preu_web: 4.7, boost_abonament: true, ordre: 2 },
+          { dia_id: trobar("Dia 2"), nom: "Sessió Competició dia 2", preu_taquilla: 5, preu_web: 4.7, boost_abonament: true, ordre: 0 },
+          { dia_id: trobar("Dia 2"), nom: "Sessió Asiàtica", preu_taquilla: 5, preu_web: 4.7, boost_abonament: true, ordre: 1 },
+        ];
+        await supabase.from("entrades_sessions").insert(sessionsInicials);
       }
 
       let configData = c.data;
@@ -156,7 +162,11 @@ export default function EntradesCards({ edicio }: { edicio: string }) {
       const refs: Record<string, number> = {};
       (r.data || []).forEach((row: any) => { refs[row.clau] = Number(row.valor || 0); });
 
-      const totesSessions = s.data || [];
+      // Si acabem de crear els dies base, les sessions inicials encara no
+      // s'havien carregat (es van inserir després de la consulta) — recarreguem-les.
+      const totesSessions = justSeeded
+        ? (await supabase.from("entrades_sessions").select("*").order("ordre")).data || []
+        : s.data || [];
       setDies(diesData.map((dd: any) => ({ ...dd, sessions: totesSessions.filter((ss: any) => ss.dia_id === dd.id) })));
       setConfig(configData);
       setReferencies(refs);
@@ -287,16 +297,50 @@ export default function EntradesCards({ edicio }: { edicio: string }) {
           <CampPreu value={config.festival_preu} onChange={(v) => desarConfig("festival_preu", v === "" ? "" : Number(v))} />
         </div>
         <p className="nota">{entradesAbonFestival} assistent(s) sumen a cada sessió marcada "abon." de tots els dies. El valor ({fmt(eurosAbonFestival)}) no s'atribueix a cap dia — engreix directament el total de l'edició.</p>
-        <div className="dia-ref-linia">
-          Referència 2026: <RefInput valor={referencies["abonament_festival"] ?? null} onDesar={(v) => desarReferencia("abonament_festival", v)} />
-        </div>
       </div>
 
-      <div className="eyebrow" style={{ marginTop: 28 }}>Total general (edició)</div>
-      <div className="dia-ref-linia" style={{ marginBottom: 8 }}>
-        Referència 2026: <RefInput valor={referencies["total_general"] ?? null} onDesar={(v) => desarReferencia("total_general", v)} />
-        {" · "}2027 (fins ara): <b style={{ color: "var(--accent-amber)" }}>{fmt(totalGeneral)}</b>
-      </div>
+      <div className="eyebrow" style={{ marginTop: 28 }}>Comparativa amb l'any passat</div>
+      <table>
+        <thead><tr><th>Dia / Sessió</th><th>2026 (€)</th><th>2027 (€)</th><th>2027 (entrades)</th></tr></thead>
+        <tbody>
+          {dies.map((d) => {
+            const abonUnitatsDia = d.te_abonaments ? Number(d.abonament_unitats || 0) : 0;
+            const eurosDia = d.sessions.reduce((s: number, x: any) => s + eurosSessio(x), 0) + (d.te_abonaments ? abonUnitatsDia * Number(d.abonament_preu || 0) : 0);
+            const entradesDiaTaula = d.sessions.reduce((s: number, x: any) => s + entradesPropiesSessio(x) + (x.boost_abonament ? abonUnitatsDia + entradesAbonFestival : 0), 0);
+            const refDia = referencies[`dia:${d.nom}`];
+            return (
+              <Fragment key={d.id}>
+                {d.sessions.map((s: any) => (
+                  <tr key={s.id}>
+                    <td className="dim" style={{ paddingLeft: 20 }}>{d.nom} · {s.nom || "(sense nom)"}</td>
+                    <td className="dim"><RefInput valor={referencies[`dia:${d.nom}|sessio:${s.nom}`] ?? null} onDesar={(v) => desarReferencia(`dia:${d.nom}|sessio:${s.nom}`, v)} /></td>
+                    <td>{fmt(eurosSessio(s))}</td>
+                    <td>{entradesPropiesSessio(s) + (s.boost_abonament ? abonUnitatsDia + entradesAbonFestival : 0)}</td>
+                  </tr>
+                ))}
+                <tr style={{ fontWeight: 600 }}>
+                  <td>{d.nom} — total</td>
+                  <td className="dim"><RefInput valor={refDia ?? null} onDesar={(v) => desarReferencia(`dia:${d.nom}`, v)} /></td>
+                  <td style={{ color: "var(--accent-amber)" }}>{fmt(eurosDia)}</td>
+                  <td style={{ color: "var(--accent-amber)" }}>{entradesDiaTaula}</td>
+                </tr>
+              </Fragment>
+            );
+          })}
+          <tr>
+            <td className="dim" style={{ paddingLeft: 20 }}>Abonament Tot Festival (no atribuït a cap dia)</td>
+            <td className="dim"><RefInput valor={referencies["abonament_festival"] ?? null} onDesar={(v) => desarReferencia("abonament_festival", v)} /></td>
+            <td>{fmt(eurosAbonFestival)}</td>
+            <td>{entradesAbonFestival}</td>
+          </tr>
+          <tr style={{ fontWeight: 700, borderTop: "2px solid var(--border)" }}>
+            <td>Total general (edició)</td>
+            <td className="dim"><RefInput valor={referencies["total_general"] ?? null} onDesar={(v) => desarReferencia("total_general", v)} /></td>
+            <td style={{ color: "var(--accent-amber)" }}>{fmt(totalGeneral)}</td>
+            <td style={{ color: "var(--accent-amber)" }}>{entradesGeneral}</td>
+          </tr>
+        </tbody>
+      </table>
     </div>
   );
 }

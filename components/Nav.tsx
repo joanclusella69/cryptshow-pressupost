@@ -7,6 +7,7 @@ const LINKS = [
   { href: "/", label: "Resum" },
   { href: "/moviments", label: "Despeses i ingressos" },
   { href: "/proveidors", label: "Proveïdors" },
+  { href: "/activitats", label: "Activitats i convidats" },
   { href: "/entrades", label: "Entrades" },
   { href: "/mercha", label: "Mercha" },
   { href: "/cryptshow", label: "Cryptshow" },

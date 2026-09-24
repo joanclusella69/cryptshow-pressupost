@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { getTotalEntrades } from "@/lib/entradesTotal";
+import { getTotalActivitats } from "@/lib/activitatsTotal";
 
 interface CategoriaGridProps {
   edicio: string;
@@ -11,7 +12,7 @@ interface CategoriaGridProps {
   refreshKey: number;
 }
 
-const CATEGORIES_AUTOMATIQUES = ["Aportació Cryptshow", "Publicitat i patrocinadors"];
+const CATEGORIES_AUTOMATIQUES = ["Aportació Cryptshow", "Publicitat i patrocinadors", "Activitats i convidats"];
 
 export default function CategoriaGrid({ edicio, tipus, categories, refreshKey }: CategoriaGridProps) {
   const [reals, setReals] = useState<Record<string, number>>({});
@@ -47,6 +48,11 @@ export default function CategoriaGrid({ edicio, tipus, categories, refreshKey }:
       const totalMercha = (mer.data || []).reduce((s: number, m: any) => s + Number(m.total || 0), 0);
       const totalAltres = (altres.data || []).reduce((s: number, a: any) => s + Number(a.import || 0), 0);
       r["Aportació Cryptshow"] = totalEntrades + totalMercha + totalAltres;
+    }
+
+    if (tipus === "despesa") {
+      const totalActivitats = await getTotalActivitats(edicio);
+      r["Activitats i convidats"] = (r["Activitats i convidats"] || 0) + totalActivitats;
     }
 
     const p: Record<string, number> = {};

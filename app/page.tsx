@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { EDICIONS } from "@/lib/fields";
 import { getTotalEntrades } from "@/lib/entradesTotal";
+import { getTotalActivitats } from "@/lib/activitatsTotal";
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
@@ -48,7 +49,7 @@ export default function ResumPage() {
   useEffect(() => {
     const carregar = async () => {
       setLoading(true);
-      const [mov, pub, dies, altres, mer, prev, totalEntrades] = await Promise.all([
+      const [mov, pub, dies, altres, mer, prev, totalEntrades, totalActivitats] = await Promise.all([
         supabase.from("moviments").select("tipus, real").eq("edicio", edicio),
         supabase.from("publicitat").select("confirmat, cobrat").eq("edicio", edicio),
         supabase.from("cryptshow_dies").select("entrades").eq("edicio", edicio),
@@ -56,10 +57,11 @@ export default function ResumPage() {
         supabase.from("mercha").select("total").eq("edicio", edicio),
         supabase.from("previstos").select("tipus, previst").eq("edicio", edicio),
         getTotalEntrades(edicio),
+        getTotalActivitats(edicio),
       ]);
 
       const ingressosManual = (mov.data || []).filter((m) => m.tipus === "ingres").reduce((s, m) => s + Number(m.real || 0), 0);
-      const despeses = (mov.data || []).filter((m) => m.tipus === "despesa").reduce((s, m) => s + Number(m.real || 0), 0);
+      const despeses = (mov.data || []).filter((m) => m.tipus === "despesa").reduce((s, m) => s + Number(m.real || 0), 0) + totalActivitats;
       const publicitat = (pub.data || []).filter((p) => p.cobrat).reduce((s, p) => s + Number(p.confirmat || 0), 0);
       const totalMercha = (mer.data || []).reduce((s, m) => s + Number(m.total || 0), 0);
       const totalAltres = (altres.data || []).reduce((s, a) => s + Number(a.import || 0), 0);

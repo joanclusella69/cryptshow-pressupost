@@ -198,6 +198,7 @@ tfoot td { border-top: 1px solid var(--border); border-bottom: none; font-weight
 .add-linia:hover { border-color: var(--accent-amber); color: var(--accent-amber); }
 .nota { font-size: 9px; color: var(--text-dim); line-height: 1.4; margin: 4px 0 0; }
 .capcalera-linia { display: flex; gap: 5px; font-size: 9px; color: var(--text-dim); text-transform: uppercase; letter-spacing: .04em; margin-bottom: 4px; padding: 0 2px; }
+.auto-note { font-size: 10px; color: var(--text-dim); margin: 0 0 6px; line-height: 1.4; }
 
 .dia-nom {
   flex: 1; background: transparent; border: none; border-bottom: 1px solid var(--border);

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { CATEGORIES_DESPESA } from "@/lib/fields";
+import { getActivitatsPerFitxa } from "@/lib/activitatsTotal";
 
 const fmt = (n: number) => `${Number(n || 0).toLocaleString("ca-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`;
 
@@ -10,18 +11,21 @@ function ApartatCard({
   categoria,
   edicio,
   moviments,
+  activitatsLinies,
   onRefresh,
 }: {
   categoria: string;
   edicio: string;
   moviments: any[];
+  activitatsLinies?: { nom: string; real: number }[];
   onRefresh: () => void;
 }) {
   const [concepte, setConcepte] = useState("");
   const [acreedor, setAcreedor] = useState("");
   const [import_, setImport] = useState("");
 
-  const total = moviments.reduce((s, m) => s + Number(m.real || 0), 0);
+  const totalActivitats = (activitatsLinies || []).reduce((s, a) => s + a.real, 0);
+  const total = moviments.reduce((s, m) => s + Number(m.real || 0), 0) + totalActivitats;
 
   const afegir = async () => {
     if (!concepte.trim() || !import_) return;
@@ -59,6 +63,20 @@ function ApartatCard({
           <div><span className="dim">Total</span> <b style={{ color: "var(--accent-amber)" }}>{fmt(total)}</b></div>
         </div>
       </div>
+
+      {activitatsLinies && (
+        <>
+          <p className="auto-note">Vinguts de la pàgina "Activitats i convidats" (no editables aquí):</p>
+          <ul className="card-list">
+            {activitatsLinies.map((a) => (
+              <li key={a.nom} style={{ alignItems: "center" }}>
+                <span>{a.nom}</span>
+                <span style={{ color: "var(--accent-amber)" }}>{fmt(a.real)}</span>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
 
       <div className="card-form" style={{ flexWrap: "wrap" }}>
         <input
@@ -104,12 +122,17 @@ function ApartatCard({
 
 export default function ProveidorsCards({ edicio }: { edicio: string }) {
   const [moviments, setMoviments] = useState<any[]>([]);
+  const [activitats, setActivitats] = useState<{ nom: string; real: number }[]>([]);
   const [loading, setLoading] = useState(true);
 
   const carregar = async () => {
     setLoading(true);
-    const { data } = await supabase.from("moviments").select("*").eq("edicio", edicio).eq("tipus", "despesa");
-    setMoviments(data || []);
+    const [mov, act] = await Promise.all([
+      supabase.from("moviments").select("*").eq("edicio", edicio).eq("tipus", "despesa"),
+      getActivitatsPerFitxa(edicio),
+    ]);
+    setMoviments(mov.data || []);
+    setActivitats(act.perFitxa);
     setLoading(false);
   };
 
@@ -128,6 +151,7 @@ export default function ProveidorsCards({ edicio }: { edicio: string }) {
           categoria={c}
           edicio={edicio}
           moviments={moviments.filter((m) => m.categoria === c)}
+          activitatsLinies={c === "Activitats i convidats" ? activitats : undefined}
           onRefresh={carregar}
         />
       ))}
